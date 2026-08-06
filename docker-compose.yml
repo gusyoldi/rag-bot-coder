@@ -1,0 +1,14 @@
+services:
+  phoenix:
+    image: arizephoenix/phoenix:version-19.18.0
+    ports:
+      - "6006:6006" # UI + OTLP HTTP
+      - "4317:4317" # OTLP gRPC
+    volumes:
+      - phoenix_data:/phoenix
+    environment:
+      PHOENIX_WORKING_DIR: /phoenix
+    restart: unless-stopped
+
+volumes:
+  phoenix_data:

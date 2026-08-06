@@ -67,7 +67,9 @@ Siempre usan `.venv/bin/python -m …`, así no dependés de `pip`/`pytest` en e
 | `pnpm ingest` | Ingesta el corpus |
 | `pnpm ingest:force` | Reindexa el corpus |
 | `pnpm start` / `pnpm dev` | CLI |
-| `pnpm phoenix` | UI local de Arize Phoenix |
+| `pnpm phoenix:up` / `phoenix:down` | Phoenix vía Docker Compose |
+| `pnpm phoenix:logs` | Logs del contenedor Phoenix |
+| `pnpm phoenix` | Phoenix en el venv (alternativa sin Docker) |
 | `pnpm test` | Unitarios + coverage (terminal) |
 | `pnpm test:cov` | Unitarios + coverage HTML con badges de color |
 | `pnpm cov:open` | Abre el reporte HTML en el browser |
@@ -78,6 +80,7 @@ Siempre usan `.venv/bin/python -m …`, así no dependés de `pip`/`pytest` en e
 
 - Python 3.11+
 - [pnpm](https://pnpm.io)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (para Phoenix vía Compose)
 - [Ollama](https://ollama.com) con:
   ```bash
   ollama pull llama3.1
@@ -127,15 +130,20 @@ Tracing opcional, activado por env (ver `.env.example`).
 
 ### Phoenix (local)
 
-1. `pnpm phoenix` (UI en `http://localhost:6006`).
+Preferido (Docker Compose — solo el servicio Phoenix; CLI y Ollama siguen en el host):
+
+1. `pnpm phoenix:up` (UI en `http://localhost:6006`).
 2. En `.env`:
    ```bash
    PHOENIX_ENABLED=true
    PHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006
    ```
 3. Corré `pnpm start` en otra terminal; las trazas aparecen en Phoenix.
+4. Parar: `pnpm phoenix:down`. Logs: `pnpm phoenix:logs`.
 
-Podés usar ambos a la vez. Sin key / sin `PHOENIX_ENABLED`, el CLI no envía trazas.
+Alternativa sin Docker: `pnpm phoenix` (servidor del venv, mismo puerto).
+
+Podés usar LangSmith y Phoenix a la vez. Sin key / sin `PHOENIX_ENABLED`, el CLI no envía trazas.
 
 ## Trello
 
@@ -180,4 +188,7 @@ grafo LangGraph y CLI.
 **Trello:** tools REST (`list_boards`, `list_lists`, `create_card`, `move_card`)
 vía router por keywords.
 
-**Pendiente:** docker-compose, k8s.
+**Docker Compose:** Phoenix (`arizephoenix/phoenix:version-19.18.0`) vía
+`pnpm phoenix:up`.
+
+**Pendiente:** k8s.

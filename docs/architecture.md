@@ -22,7 +22,8 @@ CLI → detect_trello
 | `cli/` | Hecho (muestra intent + confidence) |
 | `mcp/` Trello REST tools | Hecho |
 | LangSmith / Arize Phoenix | Hecho (`src/observability/`, env-gated) |
-| `docker-compose` / `k8s/` | Pendiente (placeholders) |
+| `docker-compose.yml` (Phoenix) | Hecho |
+| `k8s/` | Pendiente (placeholder) |
 
 ## Decisiones
 
@@ -42,6 +43,7 @@ CLI → detect_trello
 
 - **LangSmith:** si hay `LANGSMITH_API_KEY` (o legacy `LANGCHAIN_API_KEY`) → `LANGSMITH_TRACING=true`.
 - **Phoenix:** si `PHOENIX_ENABLED=true` → `phoenix.otel.register` + `LangChainInstrumentor`.
+- **Compose:** solo servicio Phoenix (`docker-compose.yml`); CLI/Ollama/Chroma siguen en el host. Preferido: `pnpm phoenix:up`; alternativa venv: `pnpm phoenix`. Endpoint: `http://localhost:6006`.
 
 ## Trello
 
@@ -52,4 +54,4 @@ CLI → detect_trello
 
 ## Pendiente
 
-docker-compose, manifiestos k8s.
+Manifiestos k8s.
