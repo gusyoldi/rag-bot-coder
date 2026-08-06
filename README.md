@@ -2,90 +2,62 @@
 
 Asistente de consola que actúa como mentor de Product Owner, usando RAG
 sobre una base de conocimiento de principios de producto y metodologías
-ágiles. No solo responde preguntas: interpreta el marco correspondiente
-(RICE, Jobs to be Done, User Story Mapping, etc.) a partir del corpus
-recuperado.
+ágiles. Interpreta si pedís teoría o traés un caso concreto, recupera
+contexto, lo reordena con un reranker local y adapta la respuesta.
 
 Proyecto final del curso de AI Engineering. Corre 100% local: LLM vía
-Ollama, base vectorial embebida (Chroma).
+Ollama, Chroma embebido, reranker cross-encoder local.
 
 ## Arquitectura
-
-El corazón del sistema es un grafo cíclico (LangGraph) que recupera
-contexto, genera una respuesta grounded y, si no hay documentos, reformula
-la búsqueda hasta un tope de intentos.
 
 ```
 Consulta del usuario (CLI)
         │
         ▼
-Retrieve + embeddings  ──── Chroma + nomic-embed-text (Ollama)
+Interpretar intención  ──── conceptual vs caso práctico
         │
         ▼
-Generar respuesta PO  ──── llama3.1 (Ollama) + contexto recuperado
+Retrieve + rerank  ──── Chroma (k=20) + cross-encoder (top 5)
         │
         ▼
-Assess  ──── ¿hay contexto?
+Generar respuesta PO  ──── llama3.1 + prompt según intención
+        │
+        ▼
+Assess confianza  ──── score de rerank
    │        │
-   │        └──── no → reformular query (vuelve a Retrieve, máx. 3)
-   └───────────────────── sí → respuesta en consola
+   │        └──── débil → reformular query (máx. 3)
+   └───────────────────── OK → respuesta en consola
 ```
 
 Detalle en [`docs/architecture.md`](docs/architecture.md).
 
 ### Dominio vs infraestructura
 
-El “qué es este coach” vive en `src/domain/`. El resto del código es genérico
-y no debe hardcodear copy, corpus ni identidad de negocio.
-
 | Capa | Qué incluye | Cómo cambia |
 |---|---|---|
-| **Dominio** | `src/domain/` + `data/corpus/<domain-id>/` | Nuevo módulo de dominio + entrada en el registry; `DOMAIN_ID` elige cuál cargar |
-| **Infraestructura** | `cli`, `ingestion`, `retrieval`, `ranking`, `orchestration`, `agent`, `mcp`, `observability` | Agnóstica al negocio; consume `get_domain()` |
-
-Hoy el dominio default es `product-owner` (PO Copilot).
+| **Dominio** | `src/domain/` + `data/corpus/<domain-id>/` | Nuevo módulo + registry; `DOMAIN_ID` |
+| **Infraestructura** | `cli`, `ingestion`, `retrieval`, `ranking`, `orchestration`, `agent`, … | Consume `get_domain()` |
 
 ### Componentes
 
 | Componente | Responsabilidad | Tecnología |
 |---|---|---|
-| `domain/` | Identidad del coach, corpus path, copy de negocio | Dataclass + registry (`DOMAIN_ID`) |
-| `ingestion/` | Carga y chunking del corpus del dominio activo | LangChain loaders + text splitters |
-| `retrieval/` | Búsqueda semántica sobre el corpus | ChromaDB + embeddings `nomic-embed-text` (Ollama) |
-| `ranking/` | Reordena resultados por relevancia (pendiente) | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
-| `orchestration/` | Prompts que arman el contexto final para el LLM | LangChain-style prompts |
-| `agent/` | Grafo cíclico retrieve → generate → assess → refine | LangGraph |
-| `mcp/` | Adaptador Trello (pendiente) | MCP |
-| `cli/` | Punto de entrada de consola | Python + `rich` |
-| `observability/` | Trazas y métricas (pendiente) | LangSmith + Arize Phoenix |
-
-## Estructura del repositorio
-
-```
-product-rag/
-├── src/
-│   ├── domain/
-│   ├── ingestion/
-│   ├── retrieval/
-│   ├── ranking/          # pendiente
-│   ├── orchestration/
-│   ├── agent/
-│   ├── mcp/              # pendiente
-│   ├── cli/
-│   └── observability/    # pendiente
-├── data/corpus/product-owner/
-├── scripts/ingest_corpus.py
-├── docs/architecture.md
-├── k8s/                  # placeholder — manifiestos pendientes
-└── tests/                # pendiente
-```
+| `domain/` | Identidad, corpus path, copy | Dataclass + registry |
+| `ingestion/` | Carga y chunking | LangChain splitters |
+| `retrieval/` | Búsqueda semántica | Chroma + `nomic-embed-text` |
+| `ranking/` | Reordena por relevancia | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+| `orchestration/` | Prompts conceptual / case | Prompt builders |
+| `agent/` | Grafo cíclico LangGraph | LangGraph + Ollama |
+| `mcp/` | Trello (pendiente) | MCP |
+| `cli/` | Consola | Rich |
+| `observability/` | Trazas (pendiente) | LangSmith + Phoenix |
 
 ## Cómo ejecutar
 
-### 1. Requisitos previos
+### 1. Requisitos
 
 - Python 3.11+
-- [Ollama](https://ollama.com) instalado, con los modelos:
+- [Ollama](https://ollama.com) con:
   ```bash
   ollama pull llama3.1
   ollama pull nomic-embed-text
@@ -96,29 +68,28 @@ product-rag/
 ```bash
 git clone <repo>
 cd product-rag
-python -m venv .venv
-source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate
 pip install -e .
-cp .env.example .env   # DOMAIN_ID=product-owner
+cp .env.example .env
 ```
 
-### 3. Ingestar el corpus
+### 3. Ingestar corpus
 
 ```bash
 python scripts/ingest_corpus.py
-# reindexar: python scripts/ingest_corpus.py --force
 ```
 
-### 4. Correr el agente por consola
+### 4. CLI
 
 ```bash
 python -m src.cli.main
 ```
 
+La primera consulta puede tardar: descarga/carga del cross-encoder.
+
 ## Estado del proyecto
 
-**Plan A hecho:** corpus seed, ingestion, retrieval Chroma/Ollama, grafo
-LangGraph y CLI usable.
+**Plan A + B hechos:** corpus, ingestion, retrieval, ranking, intención,
+grafo LangGraph y CLI.
 
-**Pendiente:** ranking + intención (Plan B), MCP Trello, LangSmith/Phoenix,
-docker-compose, manifiestos Kubernetes, suite de tests.
+**Pendiente:** MCP Trello, LangSmith/Phoenix, docker-compose, k8s, tests.

@@ -1,38 +1,39 @@
 # Architecture — PO Copilot
 
-## Estado actual (Plan A)
+## Estado actual (Plan B)
 
-Implementado el vertical slice RAG local:
+Corazón RAG local con intención, retrieval, rerank y loop de confianza:
 
 ```
-CLI → retrieve → generate → assess → refine|fallback|END
-         │                      │
-         └─ Chroma + Ollama     └─ docs vacíos: rewrite query (máx. 3)
-            (nomic-embed-text)     docs presentes: responder
+CLI → interpret_intent → retrieve (k=20) → rerank (top 5)
+        → generate → assess(confidence) → refine | fallback | END
 ```
 
 | Componente | Estado |
 |---|---|
 | `domain/` | Hecho (`product-owner`) |
 | `ingestion/` + `scripts/ingest_corpus.py` | Hecho |
-| `retrieval/` (Chroma embebido + Ollama embeddings) | Hecho |
-| `orchestration/` (prompts grounded) | Hecho |
-| `agent/` (LangGraph cíclico) | Hecho |
-| `cli/` | Hecho (sin stub) |
-| `ranking/` (cross-encoder) | Pendiente (Plan B) |
-| Intent conceptual vs caso | Pendiente (Plan B) |
+| `retrieval/` (Chroma + Ollama embeddings) | Hecho |
+| `ranking/` (cross-encoder MiniLM) | Hecho |
+| `orchestration/` (prompts conceptual / case) | Hecho |
+| `agent/` (LangGraph Plan B) | Hecho |
+| `cli/` | Hecho (muestra intent + confidence) |
 | `mcp/` Trello | Pendiente |
 | LangSmith / Arize Phoenix | Pendiente |
 | `docker-compose` / `k8s/` | Pendiente (placeholders) |
 
-## Decisiones Plan A
+## Decisiones
 
-- **Chroma embebido** en `CHROMA_PERSIST_DIR` (default `./data/chroma`), collection = `domain.id`.
-- **Sin Docker** para el slice A: solo Ollama local + persistencia en disco.
-- **Evaluate/assess:** si hay chunks recuperados → finish; si no, incrementa `attempts` y refine; a 3 intentos → fallback.
-- **Refine:** reescritura de query con `llama3.1` (no el hack `+= " explicación"` de CLASE 3).
-- Referencia didáctica: `CLASE 3/modular_vectorial/` (Gemini → Ollama en este repo).
+- **Intent:** `conceptual` vs `case` vía LLM; cambia el prompt de generación y el refine.
+- **Retrieve:** `k=20` con scores vectoriales; collection = `domain.id`.
+- **Rerank:** `cross-encoder/ms-marco-MiniLM-L-6-v2` (lazy singleton; cold start en la 1ª query).
+- **Confidence:** `max(rerank_score)` con umbrales en `src/agent/confidence.py`
+  (`CONFIDENCE_OK=-10.0`, `CONFIDENCE_WEAK=-11.2`), calibrados porque el
+  cross-encoder es anglocéntrico y el CLI habla español sobre corpus en inglés.
+- **Assess:** OK → finish; débil → refine (máx. 3); muy débil tras 3 intentos → fallback.
+- **Chroma embebido** en `CHROMA_PERSIST_DIR` (sin Docker en este slice).
+- Referencias: CLASE 3 `modular_vectorial/` (grafo) + CLASE 6 `VECTORIAL_PDFS/retriever.py` (rerank).
 
 ## Pendiente
 
-Ver Plan B (ranking + intención) y luego MCP, observabilidad y despliegue.
+MCP Trello, observabilidad (LangSmith/Phoenix), docker-compose, manifiestos k8s, tests.

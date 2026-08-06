@@ -14,19 +14,22 @@ from src.domain import get_domain
 console = Console()
 
 
-def _run_query(query: str) -> str:
+def _run_query(query: str) -> dict:
     graph = get_graph()
-    result = graph.invoke(
+    return graph.invoke(
         {
             "question": query,
+            "intent": "",
+            "candidates": [],
             "retrieved_docs": [],
+            "ranked_docs": [],
+            "confidence": 0.0,
             "answer": "",
             "attempts": 0,
             "finished": False,
             "route": "",
         }
     )
-    return result.get("answer") or "(sin respuesta)"
 
 
 def main() -> None:
@@ -47,17 +50,25 @@ def main() -> None:
 
         try:
             with console.status("[dim]Pensando…[/dim]", spinner="dots"):
-                answer = _run_query(query)
+                result = _run_query(query)
         except Exception as exc:  # noqa: BLE001 — surface infra errors to CLI
             console.print(
                 "[bold red]Error[/bold red]: no pude completar la consulta. "
                 "Revisá que Ollama esté corriendo "
                 "(`ollama serve`) y que el corpus esté ingerido "
-                "(`python scripts/ingest_corpus.py`).\n"
+                "(`python scripts/ingest_corpus.py`). "
+                "La primera consulta puede tardar al cargar el cross-encoder.\n"
                 f"[dim]{exc}[/dim]"
             )
             continue
 
+        intent = result.get("intent") or "?"
+        confidence = result.get("confidence")
+        conf_txt = f"{confidence:.2f}" if isinstance(confidence, (int, float)) else "?"
+        console.print(
+            f"[dim]intent={intent} · confidence={conf_txt}[/dim]"
+        )
+        answer = result.get("answer") or "(sin respuesta)"
         console.print(f"[bold magenta]{domain.display_name}[/bold magenta]: {answer}\n")
 
 

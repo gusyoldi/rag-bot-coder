@@ -1,4 +1,4 @@
-"""Cyclic RAG graph: retrieve → generate → assess → refine|fallback|END."""
+"""RAG graph: intent → retrieve → rerank → generate → assess → refine|fallback."""
 
 from __future__ import annotations
 
@@ -9,16 +9,25 @@ from typing import Literal
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, StateGraph
 
-from src.agent.state import AgentState
+from src.agent.confidence import (
+    CONFIDENCE_OK,
+    CONFIDENCE_WEAK,
+    max_rerank_confidence,
+)
+from src.agent.state import AgentState, CandidateDocState, RankedDocState
 from src.domain import get_domain
 from src.orchestration.prompts import (
     build_answer_prompt,
+    build_intent_prompt,
     build_refine_prompt,
     fallback_message,
 )
-from src.retrieval.search import search_documents
+from src.ranking.reranker import rerank
+from src.retrieval.search import search_documents_with_scores
 
 MAX_ATTEMPTS = 3
+RETRIEVE_K = 20
+RERANK_TOP_K = 5
 
 
 @lru_cache(maxsize=1)
@@ -27,18 +36,66 @@ def _llm() -> ChatOllama:
     return ChatOllama(model="llama3.1", base_url=base_url, temperature=0.2)
 
 
+def _parse_intent(raw: str) -> Literal["conceptual", "case"]:
+    text = raw.strip().lower()
+    if "case" in text or "caso" in text:
+        return "case"
+    return "conceptual"
+
+
+def interpret_intent(state: AgentState) -> dict:
+    response = _llm().invoke(build_intent_prompt(state["question"]))
+    content = response.content if isinstance(response.content, str) else str(response.content)
+    return {"intent": _parse_intent(content)}
+
+
 def retrieve(state: AgentState) -> dict:
-    docs = search_documents(state["question"], k=3)
-    return {"retrieved_docs": docs}
+    hits = search_documents_with_scores(state["question"], k=RETRIEVE_K)
+    candidates: list[CandidateDocState] = [
+        CandidateDocState(content=content, source=source, vector_score=score)
+        for content, source, score in hits
+    ]
+    return {
+        "candidates": candidates,
+        "retrieved_docs": [content for content, _source, _score in hits],
+    }
+
+
+def rerank_docs(state: AgentState) -> dict:
+    candidates = [
+        (doc["content"], doc["source"], float(doc["vector_score"]))
+        for doc in state.get("candidates") or []
+    ]
+    ranked = rerank(state["question"], candidates, top_k=RERANK_TOP_K)
+    ranked_state: list[RankedDocState] = [
+        RankedDocState(
+            content=doc.content,
+            source=doc.source,
+            vector_score=doc.vector_score,
+            rerank_score=doc.rerank_score,
+        )
+        for doc in ranked
+    ]
+    confidence = max_rerank_confidence([doc.rerank_score for doc in ranked])
+    return {
+        "ranked_docs": ranked_state,
+        "retrieved_docs": [doc.content for doc in ranked],
+        "confidence": confidence,
+    }
 
 
 def generate(state: AgentState) -> dict:
     domain = get_domain()
-    context = "\n\n---\n\n".join(state["retrieved_docs"])
+    docs = state.get("ranked_docs") or []
+    context = "\n\n---\n\n".join(doc["content"] for doc in docs)
+    intent = state.get("intent") or "conceptual"
+    if intent not in ("conceptual", "case"):
+        intent = "conceptual"
     prompt = build_answer_prompt(
         system_prompt=domain.system_prompt,
         context=context,
         question=state["question"],
+        intent=intent,
     )
     response = _llm().invoke(prompt)
     content = response.content if isinstance(response.content, str) else str(response.content)
@@ -46,13 +103,17 @@ def generate(state: AgentState) -> dict:
 
 
 def assess(state: AgentState) -> dict:
-    """Decide next route and persist attempt count in state."""
-    if state["retrieved_docs"]:
+    """Route by rerank confidence; persist attempt count."""
+    confidence = float(state.get("confidence") or CONFIDENCE_WEAK - 1.0)
+
+    if confidence >= CONFIDENCE_OK:
         return {"finished": True, "route": "finish"}
 
     attempts = state["attempts"] + 1
-    if attempts >= MAX_ATTEMPTS:
+    if confidence < CONFIDENCE_WEAK and attempts >= MAX_ATTEMPTS:
         return {"attempts": attempts, "route": "fallback"}
+    if attempts >= MAX_ATTEMPTS:
+        return {"attempts": attempts, "finished": True, "route": "finish"}
     return {"attempts": attempts, "route": "retry"}
 
 
@@ -66,7 +127,10 @@ def route_after_assess(state: AgentState) -> Literal["finish", "retry", "fallbac
 
 
 def refine(state: AgentState) -> dict:
-    prompt = build_refine_prompt(state["question"])
+    intent = state.get("intent") or "conceptual"
+    if intent not in ("conceptual", "case"):
+        intent = "conceptual"
+    prompt = build_refine_prompt(state["question"], intent)
     response = _llm().invoke(prompt)
     rewritten = response.content if isinstance(response.content, str) else str(response.content)
     rewritten = rewritten.strip().strip('"').strip("'")
@@ -84,16 +148,20 @@ def fallback(state: AgentState) -> dict:
 
 
 def build_graph():
-    """Compile the Plan A LangGraph agent."""
+    """Compile the Plan B LangGraph agent."""
     builder = StateGraph(AgentState)
+    builder.add_node("interpret_intent", interpret_intent)
     builder.add_node("retrieve", retrieve)
+    builder.add_node("rerank", rerank_docs)
     builder.add_node("generate", generate)
     builder.add_node("assess", assess)
     builder.add_node("refine", refine)
     builder.add_node("fallback", fallback)
 
-    builder.set_entry_point("retrieve")
-    builder.add_edge("retrieve", "generate")
+    builder.set_entry_point("interpret_intent")
+    builder.add_edge("interpret_intent", "retrieve")
+    builder.add_edge("retrieve", "rerank")
+    builder.add_edge("rerank", "generate")
     builder.add_edge("generate", "assess")
     builder.add_conditional_edges(
         "assess",
