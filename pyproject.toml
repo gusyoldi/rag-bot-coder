@@ -41,3 +41,6 @@ omit = ["src/**/__init__.py"]
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
+
+[tool.coverage.html]
+extra_css = "tests/coverage_extra.css"

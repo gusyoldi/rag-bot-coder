@@ -1,0 +1,68 @@
+/* High-contrast coverage badges for the HTML report index. */
+
+td[data-ratio].cov-high,
+td[data-ratio].cov-mid,
+td[data-ratio].cov-low,
+td[data-ratio].cov-none,
+span.pc_cov.cov-high,
+span.pc_cov.cov-mid,
+span.pc_cov.cov-low,
+span.pc_cov.cov-none {
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.15em 0.55em;
+  display: inline-block;
+  min-width: 3.25em;
+  text-align: center;
+}
+
+/* >= 90% */
+.cov-high {
+  background: #15803d !important;
+  color: #f0fdf4 !important;
+}
+
+/* 70–89% */
+.cov-mid {
+  background: #ca8a04 !important;
+  color: #422006 !important;
+}
+
+/* 40–69% */
+.cov-low {
+  background: #ea580c !important;
+  color: #fff7ed !important;
+}
+
+/* < 40% */
+.cov-none {
+  background: #b91c1c !important;
+  color: #fef2f2 !important;
+}
+
+header h1 .pc_cov {
+  font-size: 1.1em;
+  margin-left: 0.25em;
+  vertical-align: middle;
+}
+
+/* Legend under the title */
+.cov-legend {
+  margin: 0.75rem 0 0;
+  font-size: 0.85em;
+  color: #555;
+}
+
+.cov-legend span {
+  display: inline-block;
+  margin-right: 0.75em;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.1em 0.5em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cov-legend {
+    color: #bbb;
+  }
+}
