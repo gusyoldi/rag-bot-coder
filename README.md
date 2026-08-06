@@ -2,48 +2,36 @@
 
 Asistente de consola que actúa como mentor de Product Owner, usando RAG
 sobre una base de conocimiento de principios de producto y metodologías
-ágiles. No solo responde preguntas: interpreta si estás pidiendo teoría o
-trayendo un caso concreto, y adapta su respuesta para actuar como un PO
-real — aplicando el marco correspondiente (RICE, Jobs to be Done, User
-Story Mapping, etc.) en vez de solo citarlo.
+ágiles. No solo responde preguntas: interpreta el marco correspondiente
+(RICE, Jobs to be Done, User Story Mapping, etc.) a partir del corpus
+recuperado.
 
 Proyecto final del curso de AI Engineering. Corre 100% local: LLM vía
-Ollama, base vectorial embebida (Chroma), reranker local (cross-encoder),
-y una herramienta MCP que conecta con Trello para crear/consultar
-tarjetas del backlog real del usuario.
+Ollama, base vectorial embebida (Chroma).
 
 ## Arquitectura
 
-El corazón del sistema es un grafo cíclico (LangGraph) que decide en cada
-paso si tiene contexto suficiente para responder, si necesita reformular
-la búsqueda, o si necesita usar una herramienta externa.
+El corazón del sistema es un grafo cíclico (LangGraph) que recupera
+contexto, genera una respuesta grounded y, si no hay documentos, reformula
+la búsqueda hasta un tope de intentos.
 
 ```
 Consulta del usuario (CLI)
         │
         ▼
-Interpretar intención  ──── conceptual vs. caso práctico
+Retrieve + embeddings  ──── Chroma + nomic-embed-text (Ollama)
         │
         ▼
-Retrieve + rerank  ──── Chroma (búsqueda semántica) + cross-encoder
+Generar respuesta PO  ──── llama3.1 (Ollama) + contexto recuperado
         │
         ▼
-Evaluar confianza  ──── ¿el contexto recuperado alcanza?
-   │        │        │
-   │        │        └──── no alcanza → llamar MCP (Trello)
-   │        └──────────── contexto débil → reformular query (vuelve a Retrieve)
-   └───────────────────── contexto suficiente → continuar
-        │
-        ▼
-Generar respuesta PO  ──── aplica el marco recuperado al caso del usuario
-        │
-        ▼
-Respuesta en consola
+Assess  ──── ¿hay contexto?
+   │        │
+   │        └──── no → reformular query (vuelve a Retrieve, máx. 3)
+   └───────────────────── sí → respuesta en consola
 ```
 
-Todo el recorrido del grafo queda trazado en **LangSmith**, y las métricas
-de calidad (faithfulness, latencia por nodo) se envían a **Arize
-Phoenix** (self-hosted, corre en Docker junto al resto del stack).
+Detalle en [`docs/architecture.md`](docs/architecture.md).
 
 ### Dominio vs infraestructura
 
@@ -55,64 +43,44 @@ y no debe hardcodear copy, corpus ni identidad de negocio.
 | **Dominio** | `src/domain/` + `data/corpus/<domain-id>/` | Nuevo módulo de dominio + entrada en el registry; `DOMAIN_ID` elige cuál cargar |
 | **Infraestructura** | `cli`, `ingestion`, `retrieval`, `ranking`, `orchestration`, `agent`, `mcp`, `observability` | Agnóstica al negocio; consume `get_domain()` |
 
-Hoy el dominio default es `product-owner` (PO Copilot). Para agregar otro:
-crear `src/domain/<otro>.py`, registrarlo, y apuntar `DOMAIN_ID` (o el corpus)
-sin tocar el CLI.
+Hoy el dominio default es `product-owner` (PO Copilot).
 
 ### Componentes
 
 | Componente | Responsabilidad | Tecnología |
 |---|---|---|
 | `domain/` | Identidad del coach, corpus path, copy de negocio | Dataclass + registry (`DOMAIN_ID`) |
-| `ingestion/` | Carga y chunking del corpus del dominio activo | LangChain document loaders |
+| `ingestion/` | Carga y chunking del corpus del dominio activo | LangChain loaders + text splitters |
 | `retrieval/` | Búsqueda semántica sobre el corpus | ChromaDB + embeddings `nomic-embed-text` (Ollama) |
-| `ranking/` | Reordena los resultados del retrieval por relevancia real | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
-| `orchestration/` | Prompts y chains que arman el contexto final para el LLM | LangChain |
-| `agent/` | Grafo cíclico de decisión (reformular / usar herramienta / responder) | LangGraph |
-| `mcp/` | Adaptador seguro a Trello (crear/buscar tarjetas de backlog) | MCP (protocolo oficial) |
-| `cli/` | Punto de entrada de consola (genérico, lee el dominio) | Python + `rich` |
-| `observability/` | Instrumentación de trazas y métricas | LangSmith + Arize Phoenix |
-
-### Por qué estas decisiones
-
-- **Todo local (Ollama + Chroma + reranker local):** evita dependencias de
-  APIs pagas para un proyecto de curso, y mantiene consistencia — no tiene
-  sentido medir "uso de recursos" como métrica si la mitad del pipeline
-  corre en la nube de un tercero.
-- **MCP a Trello y no a un mock:** le da al agente una acción real y útil
-  (crear una tarjeta de backlog en vez de solo hablar de teoría), lo cual
-  también hace más interesante medir latencia end-to-end con una llamada
-  a herramienta externa real de por medio.
-- **Loop con tope de iteraciones:** el estado del grafo lleva un contador
-  para evitar que el ciclo de reformulación entre en un loop infinito si
-  el corpus no tiene información suficiente sobre algo.
+| `ranking/` | Reordena resultados por relevancia (pendiente) | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+| `orchestration/` | Prompts que arman el contexto final para el LLM | LangChain-style prompts |
+| `agent/` | Grafo cíclico retrieve → generate → assess → refine | LangGraph |
+| `mcp/` | Adaptador Trello (pendiente) | MCP |
+| `cli/` | Punto de entrada de consola | Python + `rich` |
+| `observability/` | Trazas y métricas (pendiente) | LangSmith + Arize Phoenix |
 
 ## Estructura del repositorio
 
 ```
-po-copilot/
+product-rag/
 ├── src/
-│   ├── domain/           # identidad de negocio (default: product-owner)
+│   ├── domain/
 │   ├── ingestion/
 │   ├── retrieval/
-│   ├── ranking/
+│   ├── ranking/          # pendiente
 │   ├── orchestration/
 │   ├── agent/
-│   ├── mcp/
+│   ├── mcp/              # pendiente
 │   ├── cli/
-│   └── observability/
-├── data/corpus/
-│   └── product-owner/    # corpus del dominio default
-├── k8s/                  # manifiestos de despliegue (Deployment, Service, HPA)
-├── scripts/               # automatización de despliegue, escalado e ingestión
-├── docs/
-│   ├── architecture.md   # decisiones arquitectónicas en detalle
-│   ├── metrics.md        # definición de métricas de observabilidad
-│   └── deployment.md     # proceso de despliegue y monitoreo
-└── tests/
+│   └── observability/    # pendiente
+├── data/corpus/product-owner/
+├── scripts/ingest_corpus.py
+├── docs/architecture.md
+├── k8s/                  # placeholder — manifiestos pendientes
+└── tests/                # pendiente
 ```
 
-## Cómo ejecutar cada módulo
+## Cómo ejecutar
 
 ### 1. Requisitos previos
 
@@ -122,54 +90,35 @@ po-copilot/
   ollama pull llama3.1
   ollama pull nomic-embed-text
   ```
-- Docker (para levantar Arize Phoenix)
 
 ### 2. Instalación
 
 ```bash
 git clone <repo>
-cd po-copilot
+cd product-rag
+python -m venv .venv
+source .venv/bin/activate
 pip install -e .
-cp .env.example .env   # DOMAIN_ID=product-owner; completar TRELLO_*, LANGCHAIN_API_KEY
+cp .env.example .env   # DOMAIN_ID=product-owner
 ```
 
-### 3. Levantar servicios locales
+### 3. Ingestar el corpus
 
 ```bash
-docker compose up -d   # Chroma + Arize Phoenix
+python scripts/ingest_corpus.py
+# reindexar: python scripts/ingest_corpus.py --force
 ```
 
-### 4. Ingestar el corpus
-
-```bash
-python scripts/ingest_corpus.py --source data/corpus/product-owner/
-```
-
-### 5. Levantar el servidor MCP de Trello
-
-```bash
-python -m src.mcp.trello_server
-```
-
-### 6. Correr el agente por consola
+### 4. Correr el agente por consola
 
 ```bash
 python -m src.cli.main
 ```
 
-### 7. Ver trazas y métricas
-
-- LangSmith: [smith.langchain.com](https://smith.langchain.com) (proyecto `po-copilot`)
-- Arize Phoenix: `http://localhost:6006`
-
-## Despliegue
-
-Los manifiestos de Kubernetes en `k8s/` están listos para un cluster real
-(GKE/EKS/AKS), con resource limits y HPA basado en CPU ya definidos. Ver
-`docs/deployment.md` para el detalle del proceso y de qué se monitorea
-en producción.
-
 ## Estado del proyecto
 
-🚧 En construcción — ver `docs/architecture.md` para el detalle de qué
-componentes están implementados y cuáles son el siguiente paso.
+**Plan A hecho:** corpus seed, ingestion, retrieval Chroma/Ollama, grafo
+LangGraph y CLI usable.
+
+**Pendiente:** ranking + intención (Plan B), MCP Trello, LangSmith/Phoenix,
+docker-compose, manifiestos Kubernetes, suite de tests.

@@ -8,6 +8,7 @@ dependencies = [
     "langgraph",
     "langchain-ollama",
     "langchain-chroma",
+    "langchain-text-splitters",
     "chromadb",
     "sentence-transformers",
     "mcp",
