@@ -35,6 +35,7 @@ def _run_query(query: str) -> dict:
             "attempts": 0,
             "finished": False,
             "route": "",
+            "wants_trello": False,
         }
     )
 

@@ -1,4 +1,4 @@
-"""RAG graph: intent → retrieve → rerank → generate → assess → refine|fallback."""
+"""RAG graph: detect Trello → RAG loop | Trello tool agent."""
 
 from __future__ import annotations
 
@@ -15,7 +15,9 @@ from src.agent.confidence import (
     max_rerank_confidence,
 )
 from src.agent.state import AgentState, CandidateDocState, RankedDocState
+from src.agent.trello_agent import trello_agent_node
 from src.domain import get_domain
+from src.mcp.detect import wants_trello
 from src.orchestration.prompts import (
     build_answer_prompt,
     build_intent_prompt,
@@ -41,6 +43,17 @@ def _parse_intent(raw: str) -> Literal["conceptual", "case"]:
     if "case" in text or "caso" in text:
         return "case"
     return "conceptual"
+
+
+def detect_trello(state: AgentState) -> dict:
+    """Flag Trello board/card requests for the tool-calling path."""
+    return {"wants_trello": wants_trello(state["question"])}
+
+
+def route_after_detect(state: AgentState) -> Literal["trello", "rag"]:
+    if state.get("wants_trello"):
+        return "trello"
+    return "rag"
 
 
 def interpret_intent(state: AgentState) -> dict:
@@ -148,8 +161,10 @@ def fallback(state: AgentState) -> dict:
 
 
 def build_graph():
-    """Compile the Plan B LangGraph agent."""
+    """Compile the Plan B LangGraph agent with optional Trello tools path."""
     builder = StateGraph(AgentState)
+    builder.add_node("detect_trello", detect_trello)
+    builder.add_node("trello_agent", trello_agent_node)
     builder.add_node("interpret_intent", interpret_intent)
     builder.add_node("retrieve", retrieve)
     builder.add_node("rerank", rerank_docs)
@@ -158,7 +173,16 @@ def build_graph():
     builder.add_node("refine", refine)
     builder.add_node("fallback", fallback)
 
-    builder.set_entry_point("interpret_intent")
+    builder.set_entry_point("detect_trello")
+    builder.add_conditional_edges(
+        "detect_trello",
+        route_after_detect,
+        {
+            "trello": "trello_agent",
+            "rag": "interpret_intent",
+        },
+    )
+    builder.add_edge("trello_agent", END)
     builder.add_edge("interpret_intent", "retrieve")
     builder.add_edge("retrieve", "rerank")
     builder.add_edge("rerank", "generate")

@@ -20,5 +20,5 @@ PRODUCT_OWNER = DomainConfig(
         "Si el contexto no alcanza, decilo con honestidad y pedí el dato que falta. "
         "No inventes hechos que no estén en el contexto."
     ),
-    tools=[],
+    tools=["list_boards", "list_lists", "create_card", "move_card"],
 )

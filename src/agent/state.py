@@ -29,3 +29,4 @@ class AgentState(TypedDict):
     attempts: int
     finished: bool
     route: Literal["finish", "retry", "fallback", ""]
+    wants_trello: bool

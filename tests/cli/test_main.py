@@ -24,6 +24,7 @@ def test_run_query_invokes_graph(monkeypatch: pytest.MonkeyPatch):
     payload = graph.invoke.call_args.args[0]
     assert payload["question"] == "qué es RICE?"
     assert payload["attempts"] == 0
+    assert payload["wants_trello"] is False
 
 
 def test_main_exit_path(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
