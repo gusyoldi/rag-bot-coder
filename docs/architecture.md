@@ -1,6 +1,6 @@
 # Architecture — PO Copilot
 
-## Estado actual (Plan B)
+## Estado actual
 
 Corazón RAG local con intención, retrieval, rerank y loop de confianza:
 
@@ -19,7 +19,7 @@ CLI → interpret_intent → retrieve (k=20) → rerank (top 5)
 | `agent/` (LangGraph Plan B) | Hecho |
 | `cli/` | Hecho (muestra intent + confidence) |
 | `mcp/` Trello | Pendiente |
-| LangSmith / Arize Phoenix | Pendiente |
+| LangSmith / Arize Phoenix | Hecho (`src/observability/`, env-gated) |
 | `docker-compose` / `k8s/` | Pendiente (placeholders) |
 
 ## Decisiones
@@ -34,6 +34,13 @@ CLI → interpret_intent → retrieve (k=20) → rerank (top 5)
 - **Chroma embebido** en `CHROMA_PERSIST_DIR` (sin Docker en este slice).
 - Referencias: CLASE 3 `modular_vectorial/` (grafo) + CLASE 6 `VECTORIAL_PDFS/retriever.py` (rerank).
 
+## Observabilidad
+
+`configure_observability()` en el CLI (después de `load_dotenv`, antes del import del grafo):
+
+- **LangSmith:** si hay `LANGSMITH_API_KEY` (o legacy `LANGCHAIN_API_KEY`) → `LANGSMITH_TRACING=true`.
+- **Phoenix:** si `PHOENIX_ENABLED=true` → `phoenix.otel.register` + `LangChainInstrumentor`.
+
 ## Pendiente
 
-MCP Trello, observabilidad (LangSmith/Phoenix), docker-compose, manifiestos k8s, tests.
+MCP Trello, docker-compose, manifiestos k8s.

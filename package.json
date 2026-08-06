@@ -10,6 +10,7 @@
     "ingest:force": ".venv/bin/python scripts/ingest_corpus.py --force",
     "start": ".venv/bin/python -m src.cli.main",
     "dev": ".venv/bin/python -m src.cli.main",
+    "phoenix": ".venv/bin/python -m phoenix.server.main serve",
     "test": ".venv/bin/python -m pytest --cov=src --cov-report=term-missing -m 'not integration'",
     "test:integration": ".venv/bin/python -m pytest -m integration -v",
     "test:all": ".venv/bin/python -m pytest --cov=src --cov-report=term-missing",

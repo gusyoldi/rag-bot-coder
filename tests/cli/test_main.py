@@ -29,6 +29,7 @@ def test_run_query_invokes_graph(monkeypatch: pytest.MonkeyPatch):
 def test_main_exit_path(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
     monkeypatch.setattr(cli_main.Prompt, "ask", lambda *_args, **_kwargs: "salir")
     monkeypatch.setattr(cli_main, "load_dotenv", lambda: None)
+    monkeypatch.setattr(cli_main, "configure_observability", lambda: None)
 
     cli_main.main()
 
@@ -41,6 +42,7 @@ def test_main_prints_answer(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Capt
     answers = iter(["qué es RICE?", "salir"])
     monkeypatch.setattr(cli_main.Prompt, "ask", lambda *_a, **_k: next(answers))
     monkeypatch.setattr(cli_main, "load_dotenv", lambda: None)
+    monkeypatch.setattr(cli_main, "configure_observability", lambda: None)
     monkeypatch.setattr(
         cli_main,
         "_run_query",
@@ -62,6 +64,7 @@ def test_main_handles_errors(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Cap
     answers = iter(["boom", "salir"])
     monkeypatch.setattr(cli_main.Prompt, "ask", lambda *_a, **_k: next(answers))
     monkeypatch.setattr(cli_main, "load_dotenv", lambda: None)
+    monkeypatch.setattr(cli_main, "configure_observability", lambda: None)
 
     def _raise(_q: str):
         raise RuntimeError("ollama down")

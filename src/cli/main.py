@@ -8,10 +8,17 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.prompt import Prompt
 
-from src.agent.graph import get_graph
 from src.domain import get_domain
+from src.observability import configure_observability
 
 console = Console()
+
+
+def get_graph():
+    """Lazy import so Phoenix can instrument LangGraph before it loads."""
+    from src.agent.graph import get_graph as _get_graph
+
+    return _get_graph()
 
 
 def _run_query(query: str) -> dict:
@@ -34,6 +41,7 @@ def _run_query(query: str) -> dict:
 
 def main() -> None:
     load_dotenv()
+    configure_observability()
     domain = get_domain()
     exit_hint = " o ".join(f"[bold]{cmd}[/bold]" for cmd in sorted(domain.exit_commands))
 

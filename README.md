@@ -50,7 +50,7 @@ Detalle en [`docs/architecture.md`](docs/architecture.md).
 | `agent/` | Grafo cíclico LangGraph | LangGraph + Ollama |
 | `mcp/` | Trello (pendiente) | MCP |
 | `cli/` | Consola | Rich |
-| `observability/` | Trazas (pendiente) | LangSmith + Phoenix |
+| `observability/` | Trazas env-gated | LangSmith + Phoenix |
 
 ## Cómo ejecutar
 
@@ -64,6 +64,7 @@ Siempre usan `.venv/bin/python -m …`, así no dependés de `pip`/`pytest` en e
 | `pnpm ingest` | Ingesta el corpus |
 | `pnpm ingest:force` | Reindexa el corpus |
 | `pnpm start` / `pnpm dev` | CLI |
+| `pnpm phoenix` | UI local de Arize Phoenix |
 | `pnpm test` | Unitarios + coverage (terminal) |
 | `pnpm test:cov` | Unitarios + coverage HTML con badges de color |
 | `pnpm cov:open` | Abre el reporte HTML en el browser |
@@ -107,6 +108,32 @@ pnpm start
 
 La primera consulta puede tardar: descarga/carga del cross-encoder.
 
+## Observabilidad
+
+Tracing opcional, activado por env (ver `.env.example`).
+
+### LangSmith (cloud)
+
+1. Creá una API key en [LangSmith](https://smith.langchain.com).
+2. En `.env`:
+   ```bash
+   LANGSMITH_API_KEY=ls-...
+   LANGSMITH_PROJECT=po-copilot
+   ```
+3. Corré `pnpm start` y mirá los runs del grafo en LangSmith.
+
+### Phoenix (local)
+
+1. `pnpm phoenix` (UI en `http://localhost:6006`).
+2. En `.env`:
+   ```bash
+   PHOENIX_ENABLED=true
+   PHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006
+   ```
+3. Corré `pnpm start` en otra terminal; las trazas aparecen en Phoenix.
+
+Podés usar ambos a la vez. Sin key / sin `PHOENIX_ENABLED`, el CLI no envía trazas.
+
 ## Tests
 
 ```bash
@@ -128,4 +155,6 @@ grafo LangGraph y CLI.
 
 **Tests:** unitarios con coverage + smokes de integración opcionales.
 
-**Pendiente:** MCP Trello, LangSmith/Phoenix, docker-compose, k8s.
+**Observabilidad:** LangSmith + Phoenix (env-gated).
+
+**Pendiente:** MCP Trello, docker-compose, k8s.
