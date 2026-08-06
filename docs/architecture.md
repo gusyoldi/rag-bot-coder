@@ -5,8 +5,10 @@
 Corazón RAG local con intención, retrieval, rerank y loop de confianza:
 
 ```
-CLI → interpret_intent → retrieve (k=20) → rerank (top 5)
-        → generate → assess(confidence) → refine | fallback | END
+CLI → detect_trello
+        ├─ yes → trello_agent (tools REST, máx. 5 turns) → END
+        └─ no  → interpret_intent → retrieve (k=20) → rerank (top 5)
+                 → generate → assess(confidence) → refine | fallback | END
 ```
 
 | Componente | Estado |
@@ -16,9 +18,9 @@ CLI → interpret_intent → retrieve (k=20) → rerank (top 5)
 | `retrieval/` (Chroma + Ollama embeddings) | Hecho |
 | `ranking/` (cross-encoder MiniLM) | Hecho |
 | `orchestration/` (prompts conceptual / case) | Hecho |
-| `agent/` (LangGraph Plan B) | Hecho |
+| `agent/` (LangGraph Plan B + Trello branch) | Hecho |
 | `cli/` | Hecho (muestra intent + confidence) |
-| `mcp/` Trello | Pendiente |
+| `mcp/` Trello REST tools | Hecho |
 | LangSmith / Arize Phoenix | Hecho (`src/observability/`, env-gated) |
 | `docker-compose` / `k8s/` | Pendiente (placeholders) |
 
@@ -41,6 +43,13 @@ CLI → interpret_intent → retrieve (k=20) → rerank (top 5)
 - **LangSmith:** si hay `LANGSMITH_API_KEY` (o legacy `LANGCHAIN_API_KEY`) → `LANGSMITH_TRACING=true`.
 - **Phoenix:** si `PHOENIX_ENABLED=true` → `phoenix.otel.register` + `LangChainInstrumentor`.
 
+## Trello
+
+- Router por keywords (`trello`, `tablero`, `board`, `tarjeta`, `card`, …).
+- Credenciales: `TRELLO_API_KEY` + `TRELLO_TOKEN` → `api.trello.com/1`.
+- Tools: `list_boards`, `list_lists`, `create_card`, `move_card`.
+- Sin credenciales: mensaje guía, sin exception al usuario.
+
 ## Pendiente
 
-MCP Trello, docker-compose, manifiestos k8s.
+docker-compose, manifiestos k8s.

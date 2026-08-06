@@ -14,6 +14,9 @@ Ollama, Chroma embebido, reranker cross-encoder local.
 Consulta del usuario (CLI)
         │
         ▼
+Detect Trello? ── sí → tools REST (boards/cards) → consola
+        │ no
+        ▼
 Interpretar intención  ──── conceptual vs caso práctico
         │
         ▼
@@ -48,7 +51,7 @@ Detalle en [`docs/architecture.md`](docs/architecture.md).
 | `ranking/` | Reordena por relevancia | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | `orchestration/` | Prompts conceptual / case | Prompt builders |
 | `agent/` | Grafo cíclico LangGraph | LangGraph + Ollama |
-| `mcp/` | Trello (pendiente) | MCP |
+| `mcp/` | Trello (REST tools) | LangChain tools + API key |
 | `cli/` | Consola | Rich |
 | `observability/` | Trazas env-gated | LangSmith + Phoenix |
 
@@ -134,6 +137,23 @@ Tracing opcional, activado por env (ver `.env.example`).
 
 Podés usar ambos a la vez. Sin key / sin `PHOENIX_ENABLED`, el CLI no envía trazas.
 
+## Trello
+
+Si la consulta menciona Trello / tablero / tarjeta / board / card, el grafo
+desvía a un agente con tools REST (no usa el path RAG).
+
+1. En [Trello Power-Ups Admin](https://trello.com/power-ups/admin) generá API key y token.
+2. En `.env`:
+   ```bash
+   TRELLO_API_KEY=...
+   TRELLO_TOKEN=...
+   ```
+3. Ejemplos en el CLI:
+   - `listá mis boards de trello`
+   - `creá una tarjeta "Spike RICE" en el tablero Product`
+
+Sin credenciales, el CLI responde con instrucciones (no crashea).
+
 ## Tests
 
 ```bash
@@ -157,4 +177,7 @@ grafo LangGraph y CLI.
 
 **Observabilidad:** LangSmith + Phoenix (env-gated).
 
-**Pendiente:** MCP Trello, docker-compose, k8s.
+**Trello:** tools REST (`list_boards`, `list_lists`, `create_card`, `move_card`)
+vía router por keywords.
+
+**Pendiente:** docker-compose, k8s.
