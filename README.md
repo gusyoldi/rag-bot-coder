@@ -54,9 +54,26 @@ Detalle en [`docs/architecture.md`](docs/architecture.md).
 
 ## Cómo ejecutar
 
+Los comandos del día a día van por **pnpm scripts** (como en Node).
+Siempre usan `.venv/bin/python -m …`, así no dependés de `pip`/`pytest` en el PATH.
+
+| Comando | Qué hace |
+|---|---|
+| `pnpm setup` | Crea `.venv` e instala deps + dev |
+| `pnpm install` / `pnpm build` | Reinstala el paquete editable |
+| `pnpm ingest` | Ingesta el corpus |
+| `pnpm ingest:force` | Reindexa el corpus |
+| `pnpm start` / `pnpm dev` | CLI |
+| `pnpm test` | Unitarios + coverage (terminal) |
+| `pnpm test:cov` | Unitarios + coverage HTML con badges de color |
+| `pnpm cov:open` | Abre el reporte HTML en el browser |
+| `pnpm test:integration` | Smokes con Ollama |
+| `pnpm test:all` | Unitarios + integration + coverage |
+
 ### 1. Requisitos
 
 - Python 3.11+
+- [pnpm](https://pnpm.io)
 - [Ollama](https://ollama.com) con:
   ```bash
   ollama pull llama3.1
@@ -68,28 +85,47 @@ Detalle en [`docs/architecture.md`](docs/architecture.md).
 ```bash
 git clone <repo>
 cd product-rag
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
 cp .env.example .env
+pnpm setup      # crea .venv e instala deps + extras dev
+# si el venv ya existe:
+pnpm install
 ```
 
 ### 3. Ingestar corpus
 
 ```bash
-python scripts/ingest_corpus.py
+pnpm ingest
+# reindexar: pnpm ingest:force
 ```
 
 ### 4. CLI
 
 ```bash
-python -m src.cli.main
+pnpm start
+# alias: pnpm dev
 ```
 
 La primera consulta puede tardar: descarga/carga del cross-encoder.
+
+## Tests
+
+```bash
+pnpm test                 # unitarios + coverage (sin Ollama)
+pnpm test:cov             # genera reporte HTML en htmlcov/
+pnpm cov:open             # abre htmlcov/index.html en el browser
+pnpm test:integration     # smokes (Ollama + corpus ingerido)
+pnpm test:all             # unitarios + integration + coverage
+```
+
+Los integration pueden tardar en la primera corrida (cross-encoder / Ollama).
+
+
 
 ## Estado del proyecto
 
 **Plan A + B hechos:** corpus, ingestion, retrieval, ranking, intención,
 grafo LangGraph y CLI.
 
-**Pendiente:** MCP Trello, LangSmith/Phoenix, docker-compose, k8s, tests.
+**Tests:** unitarios con coverage + smokes de integración opcionales.
+
+**Pendiente:** MCP Trello, LangSmith/Phoenix, docker-compose, k8s.

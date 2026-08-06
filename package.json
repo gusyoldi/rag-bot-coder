@@ -1,0 +1,20 @@
+{
+  "name": "po-copilot",
+  "private": true,
+  "description": "DX scripts for the Python RAG CLI (Node-style runners)",
+  "scripts": {
+    "setup": "python3 -m venv .venv && .venv/bin/python -m ensurepip --upgrade && .venv/bin/python -m pip install -U pip && .venv/bin/python -m pip install -e '.[dev]'",
+    "install": ".venv/bin/python -m pip install -e '.[dev]'",
+    "build": ".venv/bin/python -m pip install -e '.[dev]'",
+    "ingest": ".venv/bin/python scripts/ingest_corpus.py",
+    "ingest:force": ".venv/bin/python scripts/ingest_corpus.py --force",
+    "start": ".venv/bin/python -m src.cli.main",
+    "dev": ".venv/bin/python -m src.cli.main",
+    "test": ".venv/bin/python -m pytest --cov=src --cov-report=term-missing -m 'not integration'",
+    "test:integration": ".venv/bin/python -m pytest -m integration -v",
+    "test:all": ".venv/bin/python -m pytest --cov=src --cov-report=term-missing",
+    "test:cov": ".venv/bin/python -m pytest --cov=src --cov-report=term-missing --cov-report=html -m 'not integration' && .venv/bin/python scripts/colorize_coverage_html.py",
+    "cov:open": "open htmlcov/index.html"
+  }
+}
+
